@@ -4,7 +4,7 @@
 # Hybrid NBA Stats + Multi-Source Fetcher
 # PP Integration + Matchup Modeling
 # ----------------------------
-
+from ai_writer import create_writeup
 import json
 import os
 import time
@@ -137,6 +137,9 @@ def save_analysis(name, stat_type, line, matchup, tier, model, ev):
         json.dump(out, f, indent=4)
 
     print(f"[ENGINE] Saved → {fname}")
+
+    # 💜 Call AI Writer module
+    create_writeup(out)
 
 def calculate_ev_score(model, line, tier):
 
