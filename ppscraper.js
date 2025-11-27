@@ -14,7 +14,7 @@
 /****************************************************
  * CONFIGURATION
  ****************************************************/
-const WEBHOOK_URL = "YOUR_WEBHOOK_URL_HERE";  // replace this
+const WEBHOOK_URL = "https://discord.com/api/webhooks/1443525577687564450/kDbr5zKe3_7xOIQ1tUght-VoiCfBxJGkmE4E04YdzmNVDbfe8ZUz-K-J02Seyw2QKrJh";  // replace this
 const ALERT_INTERVAL = 600000; // 10 minutes
 const EV_THRESHOLD = 10;       // minimum EV to send alerts
 
@@ -49,7 +49,7 @@ function buildUI(){
             <button id="pp11-hide" style="background:#444;padding:4px 6px;border-radius:6px;">Hide</button>
         </div>
 
-        <input id="pp11-search" placeholder="Search player/stat/team..." 
+        <input id="pp11-search" placeholder="Search player/stat/team..."
         style="width:100%;padding:7px;border-radius:6px;margin-top:10px;">
 
         <select id="pp11-filter" style="width:100%;padding:7px;margin-top:8px;border-radius:6px;">
@@ -257,3 +257,162 @@ $("#pp11-send").onclick=()=>{
 };
 
 })();
+
+(function() {
+    'use strict';
+
+    // =========================================
+    // CREATE MAIN PANEL
+    // =========================================
+    const panel = document.createElement("div");
+    panel.id = "pp-ev-panel";
+    panel.innerHTML = `
+        <div id="pp-ev-header">EV Model v12</div>
+
+        <div class="pp-section">
+            <label><input type="checkbox" id="filter-demon" checked> Show Demons</label>
+            <label><input type="checkbox" id="filter-goblin" checked> Show Goblins</label>
+            <label><input type="checkbox" id="filter-regular" checked> Show Standard Lines</label>
+            <label><input type="checkbox" id="filter-halves" checked> Show .5 Lines</label>
+        </div>
+
+        <button id="pp-scrape-btn">SCRAPE NOW</button>
+
+        <div id="pp-status">Idle…</div>
+    `;
+
+    document.body.appendChild(panel);
+
+    // =========================================
+    // PANEL STYLES
+    // =========================================
+    const css = `
+        #pp-ev-panel {
+            position: fixed;
+            top: 120px;
+            right: 20px;
+            width: 220px;
+            background: #111;
+            border: 1px solid #444;
+            border-radius: 12px;
+            padding: 10px;
+            color: white;
+            z-index: 99999;
+            font-family: Inter, sans-serif;
+        }
+
+        #pp-ev-header {
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 8px;
+            background: linear-gradient(90deg, #5b73ff, #00d0ff);
+            -webkit-background-clip: text;
+            color: transparent;
+        }
+
+        .pp-section {
+            border: 1px solid #333;
+            padding: 8px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+        }
+
+        #pp-scrape-btn {
+            width: 100%;
+            padding: 8px;
+            border-radius: 6px;
+            border: none;
+            background: #3b82f6;
+            color: white;
+            cursor: pointer;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        #pp-scrape-btn:hover {
+            background: #60a5fa;
+        }
+
+        #pp-status {
+            font-size: 12px;
+            text-align: center;
+            opacity: 0.7;
+        }
+
+        .pp-ev-tag {
+            position: absolute;
+            bottom: 6px;
+            left: 6px;
+            padding: 2px 6px;
+            font-size: 10px;
+            border-radius: 6px;
+            background: #222;
+            color: white;
+        }
+
+        .ev-good { background: #16a34a; }   /* green */
+        .ev-mid { background: #ca8a04; }    /* yellow */
+        .ev-bad { background: #dc2626; }    /* red */
+    `;
+
+    const style = document.createElement("style");
+    style.textContent = css;
+    document.head.appendChild(style);
+
+})();
+
+function attachEVTagToProp(propElement, evScore) {
+    const tag = document.createElement("div");
+    tag.classList.add("pp-ev-tag");
+
+    if (evScore > 1.5) tag.classList.add("ev-good");
+    else if (evScore > 0) tag.classList.add("ev-mid");
+    else tag.classList.add("ev-bad");
+
+    tag.textContent = `EV ${evScore.toFixed(1)}`;
+    propElement.appendChild(tag);
+}
+
+document.getElementById("pp-scrape-btn").addEventListener("click", () => {
+    const status = document.getElementById("pp-status");
+    status.textContent = "Scraping…";
+
+    // This calls your existing scrape function
+    if (typeof window.PP_SCRAPE === "function") {
+        window.PP_SCRAPE().then(() => {
+            status.textContent = "Saved ✓";
+            setTimeout(() => status.textContent = "Idle…", 1500);
+        });
+    } else {
+        status.textContent = "Error: Scraper not loaded.";
+    }
+});
+
+async function loadEVData() {
+    const res = await fetch("http://localhost:8000/results_index.json");
+    const data = await res.json();
+    return data; // keyed by player + stat
+}
+
+function matchPropToEV(player, stat, evData) {
+    const key = player + "_" + stat;
+    if (evData[key]) return evData[key].ev_score;
+    return null;
+}
+
+async function tagAllProps() {
+    const evData = await loadEVData();
+
+    document.querySelectorAll("li[aria-label]").forEach(li => {
+        const playerName = li.querySelector("h3")?.textContent?.trim();
+        const statType = li.querySelector(".body-sm span.break-words")?.textContent?.trim();
+
+        if (!playerName || !statType) return;
+
+        const ev = matchPropToEV(playerName, statType, evData);
+        if (ev !== null) attachEVTagToProp(li, ev);
+    });
+}
+
+setInterval(tagAllProps, 5000);
